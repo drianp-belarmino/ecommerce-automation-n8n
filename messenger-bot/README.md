@@ -91,7 +91,20 @@ the bot answered badly is the only way to find out what the doc is missing.
 
 ## Setup
 
-Import all three workflows. Replace `REPLACE_WITH_YOUR_ACCESS_TOKEN` in the
-Graph API nodes, `REPLACE_WITH_YOUR_AUTHORIZATION` in the follow-up workflow,
-and `REPLACE_WITH_YOUR_GOOGLE_DOC_ID` in the ingestion workflow. Reconnect the
-Gemini, Supabase, Google Docs, Google Sheets, and Gmail credentials.
+Import all three workflows, then replace every `REPLACE_WITH_YOUR_...` value
+and reconnect the Gemini, Supabase, Google Docs, Google Sheets and Gmail
+credentials.
+
+| Placeholder | What it points at |
+|---|---|
+| `REPLACE_WITH_YOUR_ACCESS_TOKEN` | Facebook Page Access Token, in the Graph API nodes |
+| `REPLACE_WITH_YOUR_AUTHORIZATION` | Auth header in the follow-up workflow |
+| `REPLACE_WITH_YOUR_GOOGLE_DOC_ID` | The knowledge base doc, in the ingestion workflow |
+| `REPLACE_WITH_YOUR_LEADS_SHEET_ID` | Hot leads flagged by intent detection |
+| `REPLACE_WITH_YOUR_CONVERSATIONS_SHEET_ID` | Full conversation log |
+| `REPLACE_WITH_YOUR_ERROR_LOG_SHEET_ID` | AI agent and fallback failures |
+| `REPLACE_WITH_YOUR_REPLY_ERRORS_SHEET_ID` | Messenger send failures |
+
+The four sheets are deliberately separate. Mixing failure logs into the
+conversation log makes the conversation log useless for reviewing how the bot
+actually answered.

@@ -229,10 +229,10 @@
         "operation": "append",
         "documentId": {
           "__rl": true,
-          "value": "1Eg-KpzPtaqDnaaFJ5Hr_Ul-Y7npEVHhm0Qnc_PEQ9e0",
+          "value": "REPLACE_WITH_YOUR_LEADS_SHEET_ID",
           "mode": "list",
           "cachedResultName": "Bot Leads",
-          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1Eg-KpzPtaqDnaaFJ5Hr_Ul-Y7npEVHhm0Qnc_PEQ9e0/edit?usp=drivesdk"
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/REPLACE_WITH_YOUR_LEADS_SHEET_ID/edit?usp=drivesdk"
         },
         "sheetName": { "__rl": true, "value": "gid=0", "mode": "list", "cachedResultName": "Sheet1" },
         "columns": {
@@ -273,10 +273,10 @@
         "operation": "append",
         "documentId": {
           "__rl": true,
-          "value": "1Ahkz5OQRonxqEv_xo7sx-xixnHkEGf5bcjXd-WP3sWk",
+          "value": "REPLACE_WITH_YOUR_CONVERSATIONS_SHEET_ID",
           "mode": "list",
           "cachedResultName": "LOG CONVERSATION",
-          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1Ahkz5OQRonxqEv_xo7sx-xixnHkEGf5bcjXd-WP3sWk/edit?usp=drivesdk"
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/REPLACE_WITH_YOUR_CONVERSATIONS_SHEET_ID/edit?usp=drivesdk"
         },
         "sheetName": { "__rl": true, "mode": "list", "value": "gid=0" },
         "columns": {
@@ -341,10 +341,10 @@
         "operation": "append",
         "documentId": {
           "__rl": true,
-          "value": "1hG8n0ZSFm3UtdbJZNTVts2JMBrDUc17JdM__3InYnVU",
+          "value": "REPLACE_WITH_YOUR_REPLY_ERRORS_SHEET_ID",
           "mode": "list",
           "cachedResultName": "ALERT: Reply Failed",
-          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1hG8n0ZSFm3UtdbJZNTVts2JMBrDUc17JdM__3InYnVU/edit?usp=drivesdk"
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/REPLACE_WITH_YOUR_REPLY_ERRORS_SHEET_ID/edit?usp=drivesdk"
         },
         "sheetName": { "__rl": true, "mode": "list", "value": "gid=0" },
         "columns": {
@@ -406,10 +406,10 @@
         "operation": "append",
         "documentId": {
           "__rl": true,
-          "value": "1UK3CfDltn7O8VjwSOFEPn8zy0lPJkWIUs44skwLPptM",
+          "value": "REPLACE_WITH_YOUR_ERROR_LOG_SHEET_ID",
           "mode": "list",
           "cachedResultName": "ALERT: Fallback Failed",
-          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1UK3CfDltn7O8VjwSOFEPn8zy0lPJkWIUs44skwLPptM/edit?usp=drivesdk"
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/REPLACE_WITH_YOUR_ERROR_LOG_SHEET_ID/edit?usp=drivesdk"
         },
         "sheetName": { "__rl": true, "mode": "list", "value": "gid=0" },
         "columns": {
@@ -446,10 +446,10 @@
         "operation": "append",
         "documentId": {
           "__rl": true,
-          "value": "1UK3CfDltn7O8VjwSOFEPn8zy0lPJkWIUs44skwLPptM",
+          "value": "REPLACE_WITH_YOUR_ERROR_LOG_SHEET_ID",
           "mode": "list",
           "cachedResultName": "ALERT: Fallback Failed",
-          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1UK3CfDltn7O8VjwSOFEPn8zy0lPJkWIUs44skwLPptM/edit?usp=drivesdk"
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/REPLACE_WITH_YOUR_ERROR_LOG_SHEET_ID/edit?usp=drivesdk"
         },
         "sheetName": { "__rl": true, "mode": "list", "value": "gid=0" },
         "columns": {
