@@ -1,0 +1,153 @@
+{
+  "name": "Knowledge Base Ingestion",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 0],
+      "id": "11111111-1111-1111-1111-111111111111",
+      "name": "Run Ingestion"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "documentURL": "REPLACE_WITH_YOUR_GOOGLE_DOC_ID"
+      },
+      "type": "n8n-nodes-base.googleDocs",
+      "typeVersion": 2,
+      "position": [240, 0],
+      "id": "22222222-2222-2222-2222-222222222222",
+      "name": "Get Store Knowledge Base",
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "xwzjWDMj3yJElQE3",
+          "name": "Google Docs account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "tableName": "documents",
+        "queryName": "match_documents",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
+      "typeVersion": 1,
+      "position": [480, 0],
+      "id": "33333333-3333-3333-3333-333333333333",
+      "name": "Insert into Supabase",
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_YOUR_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "dataType": "json",
+        "jsonData": "={{ $json.content }}",
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "source",
+                "value": "Store Knowledge Base"
+              },
+              {
+                "name": "updated",
+                "value": "={{ $now.toISO() }}"
+              }
+            ]
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1,
+      "position": [480, 200],
+      "id": "44444444-4444-4444-4444-444444444444",
+      "name": "Load Document Content"
+    },
+    {
+      "parameters": {
+        "chunkSize": 500,
+        "chunkOverlap": 50,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+      "typeVersion": 1,
+      "position": [640, 200],
+      "id": "55555555-5555-5555-5555-555555555555",
+      "name": "Split into Chunks"
+    },
+    {
+      "parameters": {
+        "modelName": "models/text-embedding-004"
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsGoogleGemini",
+      "typeVersion": 1,
+      "position": [320, 200],
+      "id": "66666666-6666-6666-6666-666666666666",
+      "name": "Embed Chunks",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "TJpJwfrgiM7z1LXu",
+          "name": "Key0"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "KNOWLEDGE BASE INGESTION\n\nRUN THIS WORKFLOW:\n→ Once before activating the RAG chatbot\n→ Every time you update the store Google Doc\n\nWHAT IT DOES:\n1. Reads your Google Doc knowledge base\n2. Splits it into 500-token chunks (50 token overlap)\n3. Embeds each chunk using Gemini text-embedding-004\n4. Stores all chunks in Supabase documents table\n\nBEFORE RE-RUNNING (knowledge base update):\nRun this SQL in Supabase first to clear old chunks:\nDELETE FROM documents;\nThen run this workflow again.\n\nTO DO:\n→ Replace REPLACE_WITH_YOUR_SUPABASE_CREDENTIAL_ID\n   in the Insert into Supabase node with your\n   actual Supabase credential ID from n8n.\n\nEXPECTED RESULT:\nSuccessful run = your Google Doc is now\nsearchable by the RAG chatbot via vector similarity.",
+        "height": 380,
+        "width": 440,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-240, -80],
+      "id": "77777777-7777-7777-7777-777777777777",
+      "name": "Ingestion Instructions"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Run Ingestion": {
+      "main": [
+        [{ "node": "Get Store Knowledge Base", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Store Knowledge Base": {
+      "main": [
+        [{ "node": "Insert into Supabase", "type": "main", "index": 0 }]
+      ]
+    },
+    "Load Document Content": {
+      "ai_document": [
+        [{ "node": "Insert into Supabase", "type": "ai_document", "index": 0 }]
+      ]
+    },
+    "Split into Chunks": {
+      "ai_textSplitter": [
+        [{ "node": "Load Document Content", "type": "ai_textSplitter", "index": 0 }]
+      ]
+    },
+    "Embed Chunks": {
+      "ai_embedding": [
+        [{ "node": "Insert into Supabase", "type": "ai_embedding", "index": 0 }]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "ingestion-v1",
+  "meta": {
+    "instanceId": "edca2ba8336ef078fb7217ea0763f3c9a103305e62321187306a5d1fef590916"
+  },
+  "id": "ingestion-store-kb",
+  "tags": []
+}

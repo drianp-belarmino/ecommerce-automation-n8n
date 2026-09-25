@@ -1,0 +1,668 @@
+{
+  "name": "Abandoned Cart Recovery",
+  "nodes": [
+    {
+      "parameters": {
+        "topic": "checkouts/create"
+      },
+      "type": "n8n-nodes-base.shopifyTrigger",
+      "typeVersion": 1,
+      "position": [0, 0],
+      "id": "aa001001-0001-0001-0001-000000000001",
+      "name": "Abandoned Checkout",
+      "webhookId": "REPLACE_WITH_WEBHOOK_ID",
+      "credentials": {
+        "shopifyApi": {
+          "id": "REPLACE_WITH_SHOPIFY_CREDENTIAL_ID",
+          "name": "Shopify account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "cond-email-001",
+              "leftValue": "={{ $json.email }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "notEmpty" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [240, 0],
+      "id": "bb002002-0002-0002-0002-000000000002",
+      "name": "Has Email?"
+    },
+    {
+      "parameters": {
+        "amount": 1,
+        "unit": "hours"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [480, -80],
+      "id": "cc003003-0003-0003-0003-000000000003",
+      "name": "Wait 1 Hour",
+      "webhookId": "wait-webhook-0003"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://REPLACE_WITH_YOUR_STORE.myshopify.com/admin/api/2024-01/orders.json",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Shopify-Access-Token", "value": "REPLACE_WITH_SHOPIFY_ACCESS_TOKEN" }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "email", "value": "={{ $('Abandoned Checkout').item.json.email }}" },
+            { "name": "financial_status", "value": "paid" },
+            { "name": "created_at_min", "value": "={{ $('Abandoned Checkout').item.json.created_at }}" },
+            { "name": "limit", "value": "1" }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [720, -80],
+      "id": "dd004004-0004-0004-0004-000000000004",
+      "name": "Check if Purchased 1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "cond-purchased-001",
+              "leftValue": "={{ $json.orders.length }}",
+              "rightValue": 0,
+              "operator": { "type": "number", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [960, -80],
+      "id": "ee005005-0005-0005-0005-000000000005",
+      "name": "Still Abandoned 1?"
+    },
+    {
+      "parameters": {
+        "prompt": "=You are an email copywriter for the store, a laptop bag and sleeve shop in the Philippines.\n\nWrite Email 1 of 3 in an abandoned cart recovery sequence. This is a casual, friendly reminder — no pressure, no discount.\n\nCustomer name: {{ $('Abandoned Checkout').item.json.billing_address?.first_name || 'there' }}\nAbandoned products: {{ $('Abandoned Checkout').item.json.line_items.map(i => i.title + ' x' + i.quantity + ' (₱' + i.price + ')').join(', ') }}\nCart total: ₱{{ $('Abandoned Checkout').item.json.total_price }}\nCart recovery URL: {{ $('Abandoned Checkout').item.json.abandoned_checkout_url }}\n\nRules:\n- Warm and conversational, like a friend\n- Body under 100 words\n- Reference the specific product by name\n- One clear call to action with the recovery link\n- No urgency language, no discounts\n\nReturn valid JSON only (no markdown, no code blocks):\n{\"subject\": \"...\", \"body\": \"...\"}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [1200, -80],
+      "id": "ff006006-0006-0006-0006-000000000006",
+      "name": "Generate Email 1"
+    },
+    {
+      "parameters": {
+        "model": "mistral-small-latest",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatMistralCloud",
+      "typeVersion": 1,
+      "position": [1200, 120],
+      "id": "ff006006-0006-0006-0006-000000000606",
+      "name": "Mistral — Email 1",
+      "credentials": {
+        "mistralCloudApi": {
+          "id": "REPLACE_WITH_MISTRAL_CREDENTIAL_ID",
+          "name": "Mistral Cloud account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $json.response || $json.text || '';\nlet subject, body;\ntry {\n  const parsed = JSON.parse(raw);\n  subject = parsed.subject;\n  body = parsed.body;\n} catch {\n  subject = 'You left something at the store 🛍️';\n  body = raw;\n}\nreturn [{ json: { subject, body } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1440, -80],
+      "id": "gg007007-0007-0007-0007-000000000007",
+      "name": "Parse Email 1"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Abandoned Checkout').item.json.email }}",
+        "subject": "={{ $json.subject }}",
+        "emailType": "html",
+        "message": "={{ $json.body }}",
+        "options": {
+          "senderName": "the store"
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [1680, -80],
+      "id": "hh008008-0008-0008-0008-000000000008",
+      "name": "Send Email 1",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE_WITH_GMAIL_CREDENTIAL_ID",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": { "__rl": true, "value": "REPLACE_WITH_CART_LOG_SPREADSHEET_ID", "mode": "id" },
+        "sheetName": { "__rl": true, "value": "Sheet1", "mode": "name" },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{ $now.toISO() }}",
+            "Customer Email": "={{ $('Abandoned Checkout').item.json.email }}",
+            "Customer Name": "={{ $('Abandoned Checkout').item.json.billing_address?.first_name || '' }}",
+            "Products": "={{ $('Abandoned Checkout').item.json.line_items.map(i => i.title).join(', ') }}",
+            "Cart Total": "={{ $('Abandoned Checkout').item.json.total_price }}",
+            "Email Sent": "Email 1",
+            "Status": "Sent"
+          }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1920, -80],
+      "id": "ii009009-0009-0009-0009-000000000009",
+      "name": "Log Email 1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_SHEETS_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 23,
+        "unit": "hours"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [2160, -80],
+      "id": "jj010010-0010-0010-0010-000000000010",
+      "name": "Wait 23 Hours",
+      "webhookId": "wait-webhook-0010"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://REPLACE_WITH_YOUR_STORE.myshopify.com/admin/api/2024-01/orders.json",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Shopify-Access-Token", "value": "REPLACE_WITH_SHOPIFY_ACCESS_TOKEN" }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "email", "value": "={{ $('Abandoned Checkout').item.json.email }}" },
+            { "name": "financial_status", "value": "paid" },
+            { "name": "created_at_min", "value": "={{ $('Abandoned Checkout').item.json.created_at }}" },
+            { "name": "limit", "value": "1" }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2400, -80],
+      "id": "kk011011-0011-0011-0011-000000000011",
+      "name": "Check if Purchased 2"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "cond-purchased-002",
+              "leftValue": "={{ $json.orders.length }}",
+              "rightValue": 0,
+              "operator": { "type": "number", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [2640, -80],
+      "id": "ll012012-0012-0012-0012-000000000012",
+      "name": "Still Abandoned 2?"
+    },
+    {
+      "parameters": {
+        "prompt": "=You are an email copywriter for the store, a laptop bag and sleeve shop in the Philippines.\n\nWrite Email 2 of 3 in an abandoned cart recovery sequence. This email builds value — highlight product quality, durability, and what makes Store bags worth it. Create mild urgency (stock is limited). Still no discount.\n\nCustomer name: {{ $('Abandoned Checkout').item.json.billing_address?.first_name || 'there' }}\nAbandoned products: {{ $('Abandoned Checkout').item.json.line_items.map(i => i.title + ' x' + i.quantity + ' (₱' + i.price + ')').join(', ') }}\nCart total: ₱{{ $('Abandoned Checkout').item.json.total_price }}\nCart recovery URL: {{ $('Abandoned Checkout').item.json.abandoned_checkout_url }}\n\nRules:\n- Confident, value-driven tone\n- Body under 120 words\n- Mention quality or a key product feature\n- Mild urgency — not aggressive\n- Clear CTA with recovery link\n\nReturn valid JSON only (no markdown, no code blocks):\n{\"subject\": \"...\", \"body\": \"...\"}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [2880, -80],
+      "id": "mm013013-0013-0013-0013-000000000013",
+      "name": "Generate Email 2"
+    },
+    {
+      "parameters": {
+        "model": "mistral-small-latest",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatMistralCloud",
+      "typeVersion": 1,
+      "position": [2880, 120],
+      "id": "mm013013-0013-0013-0013-000000001313",
+      "name": "Mistral — Email 2",
+      "credentials": {
+        "mistralCloudApi": {
+          "id": "REPLACE_WITH_MISTRAL_CREDENTIAL_ID",
+          "name": "Mistral Cloud account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $json.response || $json.text || '';\nlet subject, body;\ntry {\n  const parsed = JSON.parse(raw);\n  subject = parsed.subject;\n  body = parsed.body;\n} catch {\n  subject = 'Your Store bag is still waiting for you 🎒';\n  body = raw;\n}\nreturn [{ json: { subject, body } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3120, -80],
+      "id": "nn014014-0014-0014-0014-000000000014",
+      "name": "Parse Email 2"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Abandoned Checkout').item.json.email }}",
+        "subject": "={{ $json.subject }}",
+        "emailType": "html",
+        "message": "={{ $json.body }}",
+        "options": { "senderName": "the store" }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [3360, -80],
+      "id": "oo015015-0015-0015-0015-000000000015",
+      "name": "Send Email 2",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE_WITH_GMAIL_CREDENTIAL_ID",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": { "__rl": true, "value": "REPLACE_WITH_CART_LOG_SPREADSHEET_ID", "mode": "id" },
+        "sheetName": { "__rl": true, "value": "Sheet1", "mode": "name" },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{ $now.toISO() }}",
+            "Customer Email": "={{ $('Abandoned Checkout').item.json.email }}",
+            "Customer Name": "={{ $('Abandoned Checkout').item.json.billing_address?.first_name || '' }}",
+            "Products": "={{ $('Abandoned Checkout').item.json.line_items.map(i => i.title).join(', ') }}",
+            "Cart Total": "={{ $('Abandoned Checkout').item.json.total_price }}",
+            "Email Sent": "Email 2",
+            "Status": "Sent"
+          }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [3600, -80],
+      "id": "pp016016-0016-0016-0016-000000000016",
+      "name": "Log Email 2",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_SHEETS_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 48,
+        "unit": "hours"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [3840, -80],
+      "id": "qq017017-0017-0017-0017-000000000017",
+      "name": "Wait 48 Hours",
+      "webhookId": "wait-webhook-0017"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://REPLACE_WITH_YOUR_STORE.myshopify.com/admin/api/2024-01/orders.json",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Shopify-Access-Token", "value": "REPLACE_WITH_SHOPIFY_ACCESS_TOKEN" }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "email", "value": "={{ $('Abandoned Checkout').item.json.email }}" },
+            { "name": "financial_status", "value": "paid" },
+            { "name": "created_at_min", "value": "={{ $('Abandoned Checkout').item.json.created_at }}" },
+            { "name": "limit", "value": "1" }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [4080, -80],
+      "id": "rr018018-0018-0018-0018-000000000018",
+      "name": "Check if Purchased 3"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "cond-purchased-003",
+              "leftValue": "={{ $json.orders.length }}",
+              "rightValue": 0,
+              "operator": { "type": "number", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [4320, -80],
+      "id": "ss019019-0019-0019-0019-000000000019",
+      "name": "Still Abandoned 3?"
+    },
+    {
+      "parameters": {
+        "jsCode": "const token = $('Abandoned Checkout').item.json.token || Date.now().toString();\nconst code = 'COMEBACK10-' + token.slice(-6).toUpperCase();\nreturn [{ json: { discountCode: code } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [4560, -80],
+      "id": "tt020020-0020-0020-0020-000000000020",
+      "name": "Generate Discount Code"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://REPLACE_WITH_YOUR_STORE.myshopify.com/admin/api/2024-01/price_rules.json",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Shopify-Access-Token", "value": "REPLACE_WITH_SHOPIFY_ACCESS_TOKEN" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ price_rule: { title: $json.discountCode, target_type: 'line_item', target_selection: 'all', allocation_method: 'across', value_type: 'percentage', value: '-10.0', customer_selection: 'all', starts_at: new Date().toISOString(), usage_limit: 1, once_per_customer: true } }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [4800, -80],
+      "id": "uu021021-0021-0021-0021-000000000021",
+      "name": "Create Price Rule"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://REPLACE_WITH_YOUR_STORE.myshopify.com/admin/api/2024-01/price_rules/{{ $json.price_rule.id }}/discount_codes.json",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Shopify-Access-Token", "value": "REPLACE_WITH_SHOPIFY_ACCESS_TOKEN" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ discount_code: { code: $('Generate Discount Code').item.json.discountCode } }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [5040, -80],
+      "id": "vv022022-0022-0022-0022-000000000022",
+      "name": "Create Discount Code in Shopify"
+    },
+    {
+      "parameters": {
+        "prompt": "=You are an email copywriter for the store, a laptop bag and sleeve shop in the Philippines.\n\nWrite Email 3 of 3 in an abandoned cart recovery sequence. This is the FINAL email. Include a 10% discount code. Create real urgency — this offer expires in 48 hours and won't be repeated.\n\nCustomer name: {{ $('Abandoned Checkout').item.json.billing_address?.first_name || 'there' }}\nAbandoned products: {{ $('Abandoned Checkout').item.json.line_items.map(i => i.title + ' x' + i.quantity + ' (₱' + i.price + ')').join(', ') }}\nCart total: ₱{{ $('Abandoned Checkout').item.json.total_price }}\nCart recovery URL: {{ $('Abandoned Checkout').item.json.abandoned_checkout_url }}\nDiscount code: {{ $('Generate Discount Code').item.json.discountCode }}\n\nRules:\n- Urgent but not desperate\n- Body under 130 words\n- Feature the discount code prominently\n- Mention the 48-hour expiry\n- Clear CTA with recovery link\n\nReturn valid JSON only (no markdown, no code blocks):\n{\"subject\": \"...\", \"body\": \"...\"}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [5280, -80],
+      "id": "ww023023-0023-0023-0023-000000000023",
+      "name": "Generate Email 3"
+    },
+    {
+      "parameters": {
+        "model": "mistral-small-latest",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatMistralCloud",
+      "typeVersion": 1,
+      "position": [5280, 120],
+      "id": "ww023023-0023-0023-0023-000000002323",
+      "name": "Mistral — Email 3",
+      "credentials": {
+        "mistralCloudApi": {
+          "id": "REPLACE_WITH_MISTRAL_CREDENTIAL_ID",
+          "name": "Mistral Cloud account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $json.response || $json.text || '';\nlet subject, body;\ntry {\n  const parsed = JSON.parse(raw);\n  subject = parsed.subject;\n  body = parsed.body;\n} catch {\n  subject = 'Last chance — 10% off your Store bag ⏰';\n  body = raw;\n}\nreturn [{ json: { subject, body } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [5520, -80],
+      "id": "xx024024-0024-0024-0024-000000000024",
+      "name": "Parse Email 3"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Abandoned Checkout').item.json.email }}",
+        "subject": "={{ $json.subject }}",
+        "emailType": "html",
+        "message": "={{ $json.body }}",
+        "options": { "senderName": "the store" }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [5760, -80],
+      "id": "yy025025-0025-0025-0025-000000000025",
+      "name": "Send Email 3",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE_WITH_GMAIL_CREDENTIAL_ID",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": { "__rl": true, "value": "REPLACE_WITH_CART_LOG_SPREADSHEET_ID", "mode": "id" },
+        "sheetName": { "__rl": true, "value": "Sheet1", "mode": "name" },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{ $now.toISO() }}",
+            "Customer Email": "={{ $('Abandoned Checkout').item.json.email }}",
+            "Customer Name": "={{ $('Abandoned Checkout').item.json.billing_address?.first_name || '' }}",
+            "Products": "={{ $('Abandoned Checkout').item.json.line_items.map(i => i.title).join(', ') }}",
+            "Cart Total": "={{ $('Abandoned Checkout').item.json.total_price }}",
+            "Email Sent": "Email 3",
+            "Discount Code": "={{ $('Generate Discount Code').item.json.discountCode }}",
+            "Status": "Sent"
+          }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [6000, -80],
+      "id": "zz026026-0026-0026-0026-000000000026",
+      "name": "Log Email 3",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_SHEETS_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "ABANDONED CART RECOVERY — 3-EMAIL AI SEQUENCE\n\nTRIGGER: Fires when a Shopify checkout is created.\nThe workflow waits, checks if the customer bought,\nthen sends AI-personalized emails only if they didn't.\n\nSEQUENCE:\n→ 1 hour after checkout → Email 1: Friendly reminder\n→ 24 hours after Email 1 → Email 2: Value + mild urgency\n→ 48 hours after Email 2 → Email 3: 10% discount, final offer\n\nSTOP CONDITIONS:\nBefore each email, the workflow checks if the customer\nalready placed a paid order. If yes — sequence stops.\nNo unwanted emails to people who already bought.\n\nAI ENGINE: Mistral generates personalized copy using\nthe customer's name and specific products from their cart.\n\nDISCOUNT CODES: Unique per customer (COMEBACK10-XXXXXX)\nCreated live in Shopify via API before Email 3 sends.\n\nBEFORE ACTIVATING — replace all placeholders:\n→ REPLACE_WITH_YOUR_STORE.myshopify.com\n   (your Shopify store domain)\n→ REPLACE_WITH_SHOPIFY_ACCESS_TOKEN\n   (Admin API access token from Shopify Partners)\n→ REPLACE_WITH_SHOPIFY_CREDENTIAL_ID\n   (your Shopify credential ID in n8n)\n→ REPLACE_WITH_MISTRAL_CREDENTIAL_ID\n   (your Mistral Cloud credential ID in n8n)\n→ REPLACE_WITH_GMAIL_CREDENTIAL_ID\n   (your Gmail credential ID in n8n)\n→ REPLACE_WITH_SHEETS_CREDENTIAL_ID\n   (your Google Sheets credential ID in n8n)\n→ REPLACE_WITH_CART_LOG_SPREADSHEET_ID\n   (create a Google Sheet with these columns:\n   Timestamp | Customer Email | Customer Name |\n   Products | Cart Total | Email Sent | Discount Code | Status)",
+        "height": 600,
+        "width": 520,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-280, -200],
+      "id": "note-0027-0027-0027-0027-000000000027",
+      "name": "Setup Instructions"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Abandoned Checkout": {
+      "main": [[{ "node": "Has Email?", "type": "main", "index": 0 }]]
+    },
+    "Has Email?": {
+      "main": [
+        [{ "node": "Wait 1 Hour", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Wait 1 Hour": {
+      "main": [[{ "node": "Check if Purchased 1", "type": "main", "index": 0 }]]
+    },
+    "Check if Purchased 1": {
+      "main": [[{ "node": "Still Abandoned 1?", "type": "main", "index": 0 }]]
+    },
+    "Still Abandoned 1?": {
+      "main": [
+        [{ "node": "Generate Email 1", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Generate Email 1": {
+      "main": [[{ "node": "Parse Email 1", "type": "main", "index": 0 }]]
+    },
+    "Mistral — Email 1": {
+      "ai_languageModel": [[{ "node": "Generate Email 1", "type": "ai_languageModel", "index": 0 }]]
+    },
+    "Parse Email 1": {
+      "main": [[{ "node": "Send Email 1", "type": "main", "index": 0 }]]
+    },
+    "Send Email 1": {
+      "main": [[{ "node": "Log Email 1", "type": "main", "index": 0 }]]
+    },
+    "Log Email 1": {
+      "main": [[{ "node": "Wait 23 Hours", "type": "main", "index": 0 }]]
+    },
+    "Wait 23 Hours": {
+      "main": [[{ "node": "Check if Purchased 2", "type": "main", "index": 0 }]]
+    },
+    "Check if Purchased 2": {
+      "main": [[{ "node": "Still Abandoned 2?", "type": "main", "index": 0 }]]
+    },
+    "Still Abandoned 2?": {
+      "main": [
+        [{ "node": "Generate Email 2", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Generate Email 2": {
+      "main": [[{ "node": "Parse Email 2", "type": "main", "index": 0 }]]
+    },
+    "Mistral — Email 2": {
+      "ai_languageModel": [[{ "node": "Generate Email 2", "type": "ai_languageModel", "index": 0 }]]
+    },
+    "Parse Email 2": {
+      "main": [[{ "node": "Send Email 2", "type": "main", "index": 0 }]]
+    },
+    "Send Email 2": {
+      "main": [[{ "node": "Log Email 2", "type": "main", "index": 0 }]]
+    },
+    "Log Email 2": {
+      "main": [[{ "node": "Wait 48 Hours", "type": "main", "index": 0 }]]
+    },
+    "Wait 48 Hours": {
+      "main": [[{ "node": "Check if Purchased 3", "type": "main", "index": 0 }]]
+    },
+    "Check if Purchased 3": {
+      "main": [[{ "node": "Still Abandoned 3?", "type": "main", "index": 0 }]]
+    },
+    "Still Abandoned 3?": {
+      "main": [
+        [{ "node": "Generate Discount Code", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Generate Discount Code": {
+      "main": [[{ "node": "Create Price Rule", "type": "main", "index": 0 }]]
+    },
+    "Create Price Rule": {
+      "main": [[{ "node": "Create Discount Code in Shopify", "type": "main", "index": 0 }]]
+    },
+    "Create Discount Code in Shopify": {
+      "main": [[{ "node": "Generate Email 3", "type": "main", "index": 0 }]]
+    },
+    "Generate Email 3": {
+      "main": [[{ "node": "Parse Email 3", "type": "main", "index": 0 }]]
+    },
+    "Mistral — Email 3": {
+      "ai_languageModel": [[{ "node": "Generate Email 3", "type": "ai_languageModel", "index": 0 }]]
+    },
+    "Parse Email 3": {
+      "main": [[{ "node": "Send Email 3", "type": "main", "index": 0 }]]
+    },
+    "Send Email 3": {
+      "main": [[{ "node": "Log Email 3", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "versionId": "cart-recovery-v1",
+  "meta": {
+    "instanceId": "edca2ba8336ef078fb7217ea0763f3c9a103305e62321187306a5d1fef590916"
+  },
+  "id": "cart-recovery-store-kb",
+  "tags": []
+}

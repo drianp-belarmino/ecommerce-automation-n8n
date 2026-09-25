@@ -1,0 +1,253 @@
+{
+  "name": "Hot Lead Follow-up",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "minutes", "minutesInterval": 15 }]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0],
+      "id": "aa111111-1111-1111-1111-111111111111",
+      "name": "Every 15 Minutes"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_BOT_LEADS_SPREADSHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Sheet1",
+          "mode": "name"
+        },
+        "filtersUI": {},
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [240, 0],
+      "id": "bb222222-2222-2222-2222-222222222222",
+      "name": "Get Bot Leads",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_SHEETS_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst now = Date.now();\nconst oneHourMs = 60 * 60 * 1000;\n\nconst qualifying = items.filter(item => {\n  const ts = new Date(item.json['Timestamp']).getTime();\n  const status = (item.json['Status'] || '').trim();\n\n  return (\n    !isNaN(ts) &&\n    (now - ts) >= oneHourMs &&\n    status === 'New'\n  );\n});\n\nif (qualifying.length === 0) {\n  return [{ json: { hasLeads: false } }];\n}\n\nreturn qualifying.map(item => ({ json: { ...item.json, hasLeads: true } }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 0],
+      "id": "cc333333-3333-3333-3333-333333333333",
+      "name": "Filter Qualifying Leads"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond-001",
+              "leftValue": "={{ $json.hasLeads }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [720, 0],
+      "id": "dd444444-4444-4444-4444-444444444444",
+      "name": "Has Leads to Follow Up?"
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [960, -80],
+      "id": "ee555555-5555-5555-5555-555555555555",
+      "name": "Process One Lead at a Time"
+    },
+    {
+      "parameters": {
+        "jsCode": "const productInterest = ($json['Product Interest'] || 'our laptop bags').trim();\nconst senderId = $json['Sender ID'];\n\nconst message = [\n  `Hi! Just checking in — were you still interested in ${productInterest}? We'd love to help you find the perfect one! 😊`,\n  `Hi po! Nandito pa kami kung gusto ninyong ituloy. Huwag mahiyang magtanong tungkol sa ${productInterest}! 😊`\n].join('\\n\\n');\n\nreturn [{\n  json: {\n    ...($json),\n    followUpMessage: message,\n    recipientId: senderId\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1200, -80],
+      "id": "ff666666-6666-6666-6666-666666666666",
+      "name": "Build Follow-up Message"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v25.0/me/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer REPLACE_WITH_YOUR_PAGE_ACCESS_TOKEN"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ recipient: { id: $json.recipientId }, message: { text: $json.followUpMessage } }) }}",
+        "options": {
+          "retry": {
+            "enabled": true,
+            "maxRetries": 2,
+            "retryInterval": 1000
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1440, -80],
+      "id": "aa777777-7777-7777-7777-777777777777",
+      "name": "Send Follow-up via Messenger"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_BOT_LEADS_SPREADSHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Sheet1",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Status": "Followed Up"
+          },
+          "matchingColumns": ["Sender ID"],
+          "schema": [
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Sender ID",
+              "displayName": "Sender ID",
+              "required": false,
+              "defaultMatch": true,
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1680, -80],
+      "id": "bb888888-8888-8888-8888-888888888888",
+      "name": "Mark Lead as Followed Up",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_SHEETS_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "HOT LEAD FOLLOW-UP WORKFLOW\n\nRuns every 15 minutes automatically.\n\nWHAT IT DOES:\n→ Reads your Bot Leads Google Sheet\n→ Finds leads older than 1 hour with Status = 'New'\n→ Sends a personalized follow-up message via Messenger\n   (references the customer's specific product interest)\n→ Updates their Status to 'Followed Up'\n→ Each lead only ever receives ONE follow-up\n\nBEFORE ACTIVATING — replace these 4 things:\n\n1. REPLACE_WITH_BOT_LEADS_SPREADSHEET_ID\n   → Open your Bot Leads Google Sheet\n   → Copy the ID from the URL between /d/ and /edit\n   → Paste into both Google Sheets nodes\n\n2. REPLACE_WITH_SHEET_TAB_NAME\n   → The name of the tab in your sheet (e.g. 'Bot Leads')\n   → Paste into both Google Sheets nodes\n\n3. REPLACE_WITH_SHEETS_CREDENTIAL_ID\n   → Your Google Sheets credential from n8n\n   → Applies to both Google Sheets nodes\n\n4. REPLACE_WITH_YOUR_PAGE_ACCESS_TOKEN\n   → Same token used in the main RAG chatbot\n   → Paste into the HTTP Request node\n\nFACEBOOK POLICY NOTE:\nFollow-up messages only work within the 24-hour\nmessaging window. Since leads trigger within minutes\nof the customer chatting, the 1-hour follow-up\nalways stays well within this limit.",
+        "height": 520,
+        "width": 480,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-280, -120],
+      "id": "cc999999-9999-9999-9999-999999999999",
+      "name": "Setup Instructions"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Every 15 Minutes": {
+      "main": [
+        [{ "node": "Get Bot Leads", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Bot Leads": {
+      "main": [
+        [{ "node": "Filter Qualifying Leads", "type": "main", "index": 0 }]
+      ]
+    },
+    "Filter Qualifying Leads": {
+      "main": [
+        [{ "node": "Has Leads to Follow Up?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Has Leads to Follow Up?": {
+      "main": [
+        [{ "node": "Process One Lead at a Time", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Process One Lead at a Time": {
+      "main": [
+        [{ "node": "Build Follow-up Message", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Build Follow-up Message": {
+      "main": [
+        [{ "node": "Send Follow-up via Messenger", "type": "main", "index": 0 }]
+      ]
+    },
+    "Send Follow-up via Messenger": {
+      "main": [
+        [{ "node": "Mark Lead as Followed Up", "type": "main", "index": 0 }]
+      ]
+    },
+    "Mark Lead as Followed Up": {
+      "main": [
+        [{ "node": "Process One Lead at a Time", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "followup-v1",
+  "meta": {
+    "instanceId": "edca2ba8336ef078fb7217ea0763f3c9a103305e62321187306a5d1fef590916"
+  },
+  "id": "followup-store-kb",
+  "tags": []
+}

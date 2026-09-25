@@ -1,0 +1,658 @@
+{
+  "name": "FB Messenger Bot — RAG Upgraded",
+  "nodes": [
+    {
+      "parameters": {
+        "multipleMethods": true,
+        "path": "30ba9006-b898-43c5-a394-abf89381e803",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [-992, -352],
+      "id": "8df56f53-77ac-4f83-ac91-625610296926",
+      "name": "Webhook",
+      "webhookId": "30ba9006-b898-43c5-a394-abf89381e803"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "33308e80-6d58-4409-bade-abf02bf51c59",
+              "leftValue": "={{ $json.query.hub_mode }}",
+              "rightValue": "subscribe",
+              "operator": { "type": "string", "operation": "equals" }
+            },
+            {
+              "id": "0e9046de-e72c-45fe-a080-45648a37e91f",
+              "leftValue": "={{ $json.query.hub_verify_token }}",
+              "rightValue": "cash4max",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [-736, -448],
+      "id": "b3ebea84-dcf4-42ef-946e-2d483ed832ae",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json.query['hub.challenge'] }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [-512, -464],
+      "id": "1988d986-28fc-4773-abcc-3a070fb6fbf5",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "check-text-exists",
+              "leftValue": "={{ $json.body.entry[0].messaging[0].message?.text }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "exists" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [-512, -256],
+      "id": "47535e2c-0a95-4499-bb47-9603733afe77",
+      "name": "Has Text Message?"
+    },
+    {
+      "parameters": {
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\n\nif (!staticData.seenMessages) {\n  staticData.seenMessages = {};\n}\n\nconst messageId = $input.first().json.body.entry[0].messaging[0].message.mid;\nconst now = Date.now();\n\nfor (const id in staticData.seenMessages) {\n  if (now - staticData.seenMessages[id] > 300000) {\n    delete staticData.seenMessages[id];\n  }\n}\n\nif (staticData.seenMessages[messageId]) {\n  return [];\n}\n\nstaticData.seenMessages[messageId] = now;\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-288, -352],
+      "id": "966b302f-90b1-4fc4-987a-6ed14cb44b1a",
+      "name": "Deduplicate Messages"
+    },
+    {
+      "parameters": {
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\n\nif (!staticData.rateLimits) {\n  staticData.rateLimits = {};\n}\n\nconst senderId = $input.first().json.body.entry[0].messaging[0].sender.id;\nconst now = Date.now();\nconst windowMs = 300000;\nconst maxMessages = 10;\n\nif (!staticData.rateLimits[senderId]) {\n  staticData.rateLimits[senderId] = [];\n}\n\nstaticData.rateLimits[senderId] = staticData.rateLimits[senderId].filter(\n  ts => now - ts < windowMs\n);\n\nif (staticData.rateLimits[senderId].length >= maxMessages) {\n  return [];\n}\n\nstaticData.rateLimits[senderId].push(now);\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-64, -352],
+      "id": "f4e5d6c7-b8a9-0123-def0-123456789abc",
+      "name": "Rate Limit Per User"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('Webhook').item.json.body.entry[0].messaging[0].message.text }}\n",
+        "options": {
+          "systemMessage": "You are a customer support assistant for the store, an online laptop bag shop in the Philippines. You reply to customers on Facebook Messenger.\n\nLANGUAGE RULE\nAlways reply in the same language the customer uses. Tagalog → Tagalog. English → English. Taglish → Taglish. If unsure, ask: \"What language would you prefer?\"\n\nTOOL USAGE RULE\nAlways use the AngleStoreKnowledgeBase tool FIRST before answering any question about products, prices, stock, shipping, or store policies. Never answer from memory.\n\nSTRICT RULES\n1. Always retrieve from the AngleStoreKnowledgeBase tool before answering. No exceptions.\n2. Only use information returned by the tool. Nothing else.\n3. Never invent, guess, or assume any price, stock status, shipping fee, or promotion.\n4. Never say a product is available unless the tool returns \"In Stock.\"\n5. You may calculate order totals using exact prices returned by the tool.\n6. If the customer asks something not covered by the tool results, say exactly: \"Thank you for your message! Let me check that with our team and get back to you shortly. 😊\"\n7. If the customer asks about any product NOT explicitly listed by name or product code in the catalog — laptops, phones, chargers, bags not in the list, anything — say exactly: \"We specialize in laptop bags and accessories! That specific item isn't in our current lineup, but let me show you what we have. 😊\" Never show ordering steps for unlisted products.\n8. Never mention the knowledge base, any tool, or that you are an AI.\n9. Never confirm orders, reserve items, or process payments. Guide customers to send order details via Messenger as described in the knowledge base.\n10. Answer price and product questions FIRST with the exact price from the tool results. NEVER show the ordering process in response to a price question. Only show the ordering process when the customer explicitly says they want to buy or asks how to place an order.\n11. When in doubt — use Rule 6. Do not guess.\n12. If the customer asks about a product NOT explicitly in the catalog, use Rule 7 IMMEDIATELY.\n\nTONE\nWarm, friendly, casual. 1-2 emojis per message. Keep replies short — customers are on mobile. Always offer to help with anything else at the end."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [160, -352],
+      "id": "98d6959f-d6c7-4f38-851f-aa5153a4bf5c",
+      "name": "AI Agent",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [112, -128],
+      "id": "d12e7ed2-d976-4bb2-b37d-6f872d2faa87",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "TJpJwfrgiM7z1LXu",
+          "name": "Key0"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Webhook').item.json.body.entry[0].messaging[0].sender.id }}",
+        "contextWindowLength": 10
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [304, -128],
+      "id": "4e4713ed-595e-44fb-b947-c626f25b84a7",
+      "name": "Window Buffer Memory"
+    },
+    {
+      "parameters": {
+        "mode": "retrieve-as-tool",
+        "toolName": "AngleStoreKnowledgeBase",
+        "toolDescription": "Retrieves product information, prices, stock availability, laptop bag specifications, ordering instructions, and store policies for the store. Always use this tool before answering any question about products, prices, availability, or policies.",
+        "topK": 3,
+        "tableName": "documents",
+        "queryName": "match_documents"
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
+      "typeVersion": 1,
+      "position": [160, 80],
+      "id": "a9b8c7d6-e5f4-3210-9876-543210fedcba",
+      "name": "Supabase Vector Store",
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_YOUR_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelName": "models/text-embedding-004"
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsGoogleGemini",
+      "typeVersion": 1,
+      "position": [0, 80],
+      "id": "12345678-90ab-cdef-0123-456789abcdef",
+      "name": "Embeddings Google Gemini",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "TJpJwfrgiM7z1LXu",
+          "name": "Key0"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const message = $('Has Text Message?').item.json.body.entry[0].messaging[0].message.text.toLowerCase();\n\nconst buyingKeywords = [\n  'order', 'bili', 'how to buy', 'paano mag order', 'how to order',\n  'paano umorder', 'umorder', 'how to purchase',\n  'how to checkout', 'paano mag checkout', 'checkout', 'check out',\n  'magkano', 'how much', 'price', 'presyo',\n  'available', 'meron pa', 'in stock',\n  'i want', 'gusto ko'\n];\n\nconst isBuyingIntent = buyingKeywords.some(keyword => message.includes(keyword));\n\nreturn [{\n  json: {\n    ...$json,\n    isBuyingIntent: isBuyingIntent,\n    senderID: $('Has Text Message?').item.json.body.entry[0].messaging[0].sender.id,\n    customerMessage: $('Has Text Message?').item.json.body.entry[0].messaging[0].message.text,\n    aiResponse: $json.output\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [512, -448],
+      "id": "e6f9b8c3-9670-43f7-87d6-1d216eaa13f1",
+      "name": "Detect Buying Intent"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "b295be6e-b465-4a51-92c0-6081ea993cd0",
+              "leftValue": "={{ $json.isBuyingIntent }}",
+              "rightValue": "",
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [736, -448],
+      "id": "2ca38896-04b5-4f34-a428-dc4d3f316fa0",
+      "name": "Is Buying Intent?"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1Eg-KpzPtaqDnaaFJ5Hr_Ul-Y7npEVHhm0Qnc_PEQ9e0",
+          "mode": "list",
+          "cachedResultName": "Bot Leads",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1Eg-KpzPtaqDnaaFJ5Hr_Ul-Y7npEVHhm0Qnc_PEQ9e0/edit?usp=drivesdk"
+        },
+        "sheetName": { "__rl": true, "value": "gid=0", "mode": "list", "cachedResultName": "Sheet1" },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Status": "New",
+            "Timestamp": "=\t{{ $now.toISO() }}",
+            "Sender ID": "=\t{{ $json.senderID }}",
+            "Product Interest": "={{ $json.customerMessage }}",
+            "Message": "={{ $json.aiResponse }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            { "id": "Timestamp", "displayName": "Timestamp", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Sender ID", "displayName": "Sender ID", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Name", "displayName": "Name", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Contact Number", "displayName": "Contact Number", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Product Interest", "displayName": "Product Interest", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Message", "displayName": "Message", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Status", "displayName": "Status", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [960, -576],
+      "id": "086da1aa-b17b-4df8-b43b-3650aec33ddb",
+      "name": "Check Existing Lead",
+      "credentials": {
+        "googleSheetsOAuth2Api": { "id": "gZuUsRYRmKt3cNc3", "name": "Google Sheets account" }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1Ahkz5OQRonxqEv_xo7sx-xixnHkEGf5bcjXd-WP3sWk",
+          "mode": "list",
+          "cachedResultName": "LOG CONVERSATION",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1Ahkz5OQRonxqEv_xo7sx-xixnHkEGf5bcjXd-WP3sWk/edit?usp=drivesdk"
+        },
+        "sheetName": { "__rl": true, "mode": "list", "value": "gid=0" },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{ $now.toISO() }}",
+            "User Message": "={{ $('Has Text Message?').item.json.body.entry[0].messaging[0].message.text }}",
+            "AI Response": "={{ $json.output }}",
+            "Status": "success",
+            "User ID": "={{ $('Has Text Message?').item.json.body.entry[0].messaging[0].sender.id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            { "id": "Timestamp", "displayName": "Timestamp", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "User ID", "displayName": "User ID", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "User Message", "displayName": "User Message", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "AI Response", "displayName": "AI Response", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Status", "displayName": "Status", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1184, -432],
+      "id": "2d127d09-70d9-433b-ac6e-eae06d9d1f3f",
+      "name": "Log Conversation",
+      "credentials": {
+        "googleSheetsOAuth2Api": { "id": "gZuUsRYRmKt3cNc3", "name": "Google Sheets account" }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v25.0/{{ $('Webhook').item.json.body.entry[0].id }}/messages",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "access_token", "value": "REPLACE_WITH_YOUR_ACCESS_TOKEN" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"recipient\": {\n    \"id\": {{ $('Webhook').item.json.body.entry[0].messaging[0].sender.id }}\n  },\n  \"messaging_type\": \"RESPONSE\",\n  \"message\": {\n    \"text\": {{ JSON.stringify($('AI Agent').item.json.output) }}\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [1408, -432],
+      "id": "e01686d4-1753-49a2-8fab-f1cb1d900ce9",
+      "name": "HTTP Request",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1hG8n0ZSFm3UtdbJZNTVts2JMBrDUc17JdM__3InYnVU",
+          "mode": "list",
+          "cachedResultName": "ALERT: Reply Failed",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1hG8n0ZSFm3UtdbJZNTVts2JMBrDUc17JdM__3InYnVU/edit?usp=drivesdk"
+        },
+        "sheetName": { "__rl": true, "mode": "list", "value": "gid=0" },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{ $now.toISO() }}",
+            "User ID": "={{ $('Has Text Message?').item.json.body.entry[0].messaging[0].sender.id }}",
+            "User Message": "={{ $('Has Text Message?').item.json.body.entry[0].messaging[0].message.text }}",
+            "Error Details": "={{ $json.error }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            { "id": "Timestamp", "displayName": "Timestamp", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "User ID", "displayName": "User ID", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "User Message", "displayName": "User Message", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Error Details", "displayName": "Error Details", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1648, -416],
+      "id": "ddd629ec-f89e-4641-acbc-7a2175a2aaba",
+      "name": "Alert: Reply Failed",
+      "credentials": {
+        "googleSheetsOAuth2Api": { "id": "gZuUsRYRmKt3cNc3", "name": "Google Sheets account" }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v25.0/{{ $('Webhook').item.json.body.entry[0].id }}/messages",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "access_token", "value": "REPLACE_WITH_YOUR_ACCESS_TOKEN" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"recipient\": {\n    \"id\": \"{{ $('Webhook').item.json.body.entry[0].messaging[0].sender.id }}\"\n  },\n  \"messaging_type\": \"RESPONSE\",\n  \"message\": {\n    \"text\": \"Thank you for your message. We're experiencing a temporary issue. Our support team will get back to you shortly.\"\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [512, -256],
+      "id": "b159379a-f318-4aa9-87b8-6d94b833c0de",
+      "name": "Send Fallback Message",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1UK3CfDltn7O8VjwSOFEPn8zy0lPJkWIUs44skwLPptM",
+          "mode": "list",
+          "cachedResultName": "ALERT: Fallback Failed",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1UK3CfDltn7O8VjwSOFEPn8zy0lPJkWIUs44skwLPptM/edit?usp=drivesdk"
+        },
+        "sheetName": { "__rl": true, "mode": "list", "value": "gid=0" },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{ $now.toISO() }}",
+            "User ID": "={{ $('Has Text Message?').item.json.body.entry[0].messaging[0].sender.id }}",
+            "User Message": "={{ $('Has Text Message?').item.json.body.entry[0].messaging[0].message.text }}",
+            "Error Details": "=Fallback also failed: {{ $json.error.message }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            { "id": "Timestamp", "displayName": "Timestamp", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "User ID", "displayName": "User ID", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "User Message", "displayName": "User Message", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Error Details", "displayName": "Error Details", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [736, -240],
+      "id": "9833d585-1b0d-4a0b-ba59-8b18f0249288",
+      "name": "Alert: Fallback Failed",
+      "credentials": {
+        "googleSheetsOAuth2Api": { "id": "gZuUsRYRmKt3cNc3", "name": "Google Sheets account" }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1UK3CfDltn7O8VjwSOFEPn8zy0lPJkWIUs44skwLPptM",
+          "mode": "list",
+          "cachedResultName": "ALERT: Fallback Failed",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1UK3CfDltn7O8VjwSOFEPn8zy0lPJkWIUs44skwLPptM/edit?usp=drivesdk"
+        },
+        "sheetName": { "__rl": true, "mode": "list", "value": "gid=0" },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{ $now.toISO() }}",
+            "User ID": "={{ $('Has Text Message?').item.json.body.entry[0].messaging[0].sender.id }}",
+            "User Message": "={{ $('Has Text Message?').item.json.body.entry[0].messaging[0].message.text }}",
+            "Error Details": "AI Agent crashed — fallback message was sent to customer successfully"
+          },
+          "matchingColumns": [],
+          "schema": [
+            { "id": "Timestamp", "displayName": "Timestamp", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "User ID", "displayName": "User ID", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "User Message", "displayName": "User Message", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Error Details", "displayName": "Error Details", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [736, -96],
+      "id": "cc112233-4455-6677-8899-aabbccddeeff",
+      "name": "Alert: AI Agent Failed",
+      "credentials": {
+        "googleSheetsOAuth2Api": { "id": "gZuUsRYRmKt3cNc3", "name": "Google Sheets account" }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nconst messaging = input.messaging \n  || (input.body && input.body.entry && input.body.entry[0] && input.body.entry[0].messaging);\n\nif (!messaging || !messaging[0] || !messaging[0].sender) {\n  throw new Error('Invalid payload structure - request rejected');\n}\n\nconst PAGE_ID = '110122647384847';\nif (messaging[0].recipient.id !== PAGE_ID) {\n  throw new Error('Wrong recipient - request rejected');\n}\n\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-736, -256],
+      "id": "b441d383-19a8-4020-a48c-8d369a49ee68",
+      "name": "Verify Webhook Signature"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v25.0/{{ $('Webhook').item.json.body.entry[0].id }}/messages",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "access_token", "value": "REPLACE_WITH_YOUR_ACCESS_TOKEN" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"recipient\": {\n    \"id\": \"{{ $('Webhook').item.json.body.entry[0].messaging[0].sender.id }}\"\n  },\n  \"messaging_type\": \"RESPONSE\",\n  \"message\": {\n    \"text\": \"Hi! 😊 We can only read text messages. Please type your question and we'll help you right away!\\n\\nHi! 😊 Text messages lang po ang aming natatanggap. I-type lang ang inyong tanong at tutulungan ka namin agad!\"\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [-288, -160],
+      "id": "5a39b5c4-6a0f-4d4a-b31a-6be987065ab4",
+      "name": "Send Unsupported Type Reply",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000
+    },
+
+    {
+      "parameters": {
+        "operation": "get",
+        "documentURL": "REPLACE_WITH_YOUR_GOOGLE_DOC_ID"
+      },
+      "type": "n8n-nodes-base.googleDocs",
+      "typeVersion": 2,
+      "position": [-64, -576],
+      "id": "3afb846a-2b37-4860-bb94-a3c6ba47123a",
+      "name": "knowledge base1 (DISCONNECTED — replaced by Supabase RAG)",
+      "credentials": {
+        "googleDocsOAuth2Api": { "id": "xwzjWDMj3yJElQE3", "name": "Google Docs account" }
+      }
+    },
+    {
+      "parameters": {
+        "content": "RAG UPGRADE — WHAT CHANGED\n\n✅ ADDED: Rate Limit Per User (was missing)\n✅ ADDED: Supabase Vector Store (retrieve-as-tool)\n✅ ADDED: Embeddings Google Gemini (text-embedding-004)\n✅ FIXED: Window Buffer Memory now uses per-user session key\n✅ UPDATED: AI Agent system prompt uses tool instead of $json.content\n⛔ DISCONNECTED: knowledge base1 (Google Doc) — kept for rollback\n\nSUPABASE SETUP REQUIRED:\n1. Create free account at supabase.com\n2. SQL Editor → run: CREATE EXTENSION IF NOT EXISTS vector;\n3. SQL Editor → create table:\n   CREATE TABLE documents (\n     id bigserial PRIMARY KEY,\n     content text,\n     metadata jsonb,\n     embedding vector(768)\n   );\n4. SQL Editor → create match function:\n   CREATE OR REPLACE FUNCTION match_documents(\n     query_embedding vector(768),\n     match_threshold float DEFAULT 0.5,\n     match_count int DEFAULT 3\n   ) RETURNS TABLE (\n     id bigint, content text, metadata jsonb, similarity float\n   ) LANGUAGE sql STABLE AS $$\n     SELECT id, content, metadata,\n       1 - (embedding <=> query_embedding) AS similarity\n     FROM documents\n     WHERE 1 - (embedding <=> query_embedding) > match_threshold\n     ORDER BY similarity DESC LIMIT match_count;\n   $$;\n5. Add Supabase credential in n8n → replace REPLACE_WITH_YOUR_SUPABASE_CREDENTIAL_ID\n6. Build ingestion workflow to load Google Doc into Supabase (separate workflow)",
+        "height": 500,
+        "width": 560,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-352, 200],
+      "id": "abcdef12-3456-7890-abcd-ef1234567890",
+      "name": "RAG Setup Instructions"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [{ "node": "If", "type": "main", "index": 0 }],
+        [{ "node": "Verify Webhook Signature", "type": "main", "index": 0 }]
+      ]
+    },
+    "If": {
+      "main": [
+        [{ "node": "Respond to Webhook", "type": "main", "index": 0 }]
+      ]
+    },
+    "Verify Webhook Signature": {
+      "main": [
+        [{ "node": "Has Text Message?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Has Text Message?": {
+      "main": [
+        [{ "node": "Deduplicate Messages", "type": "main", "index": 0 }],
+        [{ "node": "Send Unsupported Type Reply", "type": "main", "index": 0 }]
+      ]
+    },
+    "Deduplicate Messages": {
+      "main": [
+        [{ "node": "Rate Limit Per User", "type": "main", "index": 0 }]
+      ]
+    },
+    "Rate Limit Per User": {
+      "main": [
+        [{ "node": "AI Agent", "type": "main", "index": 0 }]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [{ "node": "AI Agent", "type": "ai_languageModel", "index": 0 }]
+      ]
+    },
+    "Window Buffer Memory": {
+      "ai_memory": [
+        [{ "node": "AI Agent", "type": "ai_memory", "index": 0 }]
+      ]
+    },
+    "Supabase Vector Store": {
+      "ai_tool": [
+        [{ "node": "AI Agent", "type": "ai_tool", "index": 0 }]
+      ]
+    },
+    "Embeddings Google Gemini": {
+      "ai_embedding": [
+        [{ "node": "Supabase Vector Store", "type": "ai_embedding", "index": 0 }]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [{ "node": "Detect Buying Intent", "type": "main", "index": 0 }],
+        [{ "node": "Send Fallback Message", "type": "main", "index": 0 }]
+      ]
+    },
+    "Send Fallback Message": {
+      "main": [
+        [{ "node": "Alert: AI Agent Failed", "type": "main", "index": 0 }],
+        [{ "node": "Alert: Fallback Failed", "type": "main", "index": 0 }]
+      ]
+    },
+    "Alert: AI Agent Failed": {
+      "main": [[]]
+    },
+    "Detect Buying Intent": {
+      "main": [
+        [{ "node": "Is Buying Intent?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Is Buying Intent?": {
+      "main": [
+        [{ "node": "Check Existing Lead", "type": "main", "index": 0 }],
+        [{ "node": "Log Conversation", "type": "main", "index": 0 }]
+      ]
+    },
+    "Check Existing Lead": {
+      "main": [
+        [{ "node": "Log Conversation", "type": "main", "index": 0 }]
+      ]
+    },
+    "Log Conversation": {
+      "main": [
+        [{ "node": "HTTP Request", "type": "main", "index": 0 }]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [],
+        [{ "node": "Alert: Reply Failed", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "8201be36-d2ec-4c20-bb63-1479d029765a",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "edca2ba8336ef078fb7217ea0763f3c9a103305e62321187306a5d1fef590916"
+  },
+  "id": "VvyYVD5HpjGGxKVv",
+  "tags": []
+}
