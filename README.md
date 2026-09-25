@@ -1,11 +1,11 @@
 # E-commerce Automation Workflows (n8n)
 
-Two production automations built for a Shopify apparel store: an abandoned cart
-recovery sequence and an AI customer-service bot on Facebook Messenger.
+Two automations built for a Shopify apparel store: an abandoned cart recovery
+sequence and an AI customer-service bot on Facebook Messenger.
 
-Both ran live. The client name and every credential have been removed, and the
-workflow JSON is exported as a template. These are the real workflows, not
-tutorial rebuilds.
+Built and tested end to end, then exported. The store name and every credential
+have been removed and the workflow JSON ships as a template. These are the
+workflows as built, not tutorial rebuilds.
 
 ## What is here
 
